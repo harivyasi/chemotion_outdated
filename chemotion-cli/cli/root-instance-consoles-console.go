@@ -59,7 +59,7 @@ var railsConsoleInstanceRootCmd = &cobra.Command{
 	Short:   "Drop into a Ruby on Rails console",
 	Args:    cobra.NoArgs,
 	Run: func(_ *cobra.Command, _ []string) {
-		dropIntoConsole(currentInstance, "railscc")
+		dropIntoConsole(currentInstance, "railsc")
 	},
 }
 
