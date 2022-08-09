@@ -13,10 +13,11 @@ var consoleInstanceRootCmd = &cobra.Command{
 	ValidArgs: maps.Keys(consoleInstanceCmdTable),
 	Run: func(cmd *cobra.Command, args []string) {
 		isInteractive(true)
-		acceptedOpts := []string{"shell", "ruby", "psql"}
+		acceptedOpts := []string{"shell", "rails", "PostgreSQL", "reset ADM"}
 		consoleInstanceCmdTable["shell"] = shellConsoleInstanceRootCmd.Run
-		consoleInstanceCmdTable["ruby"] = railsConsoleInstanceRootCmd.Run
-		consoleInstanceCmdTable["psql"] = psqlConsoleInstanceRootCmd.Run
+		consoleInstanceCmdTable["rails"] = railsConsoleInstanceRootCmd.Run
+		consoleInstanceCmdTable["PostgreSQL"] = psqlConsoleInstanceRootCmd.Run
+		consoleInstanceCmdTable["reset ADM"] = resetAdminPWCmd.Run
 		if cmd.Use == cmd.CalledAs() { // || elementInSlice(cmd.CalledAs(), &cmd.Aliases) > -1 { { // there are no aliases at the moment
 			acceptedOpts = append(acceptedOpts, "exit")
 		} else {
