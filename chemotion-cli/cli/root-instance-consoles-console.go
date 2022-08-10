@@ -20,15 +20,13 @@ import (
 func dropIntoConsole(givenName string, consoleName string) {
 	commandExec := exec.Command(toLower(virtualizer), []string{"compose", "exec", "eln", "chemotion", consoleName}...)
 	commandExec.Stdin, commandExec.Stdout, commandExec.Stderr = os.Stdin, os.Stdout, os.Stderr
-	switch consoleName {
+	switch consoleName { // use proper name when printing to user
 	case "shell":
 		consoleName = "shell"
 	case "railsc":
 		consoleName = "Rails console"
 	case "psql":
 		consoleName = "postgreSQL console"
-	case "resetAdminPW":
-		consoleName = "reset admin password"
 	}
 	status := instanceStatus(givenName)
 	if status == "Up" {
@@ -179,9 +177,9 @@ func executeScript(containerID string, pathToScript string) {
 	panicCheck(err)
 }
 
-var resetAdminPWCmd = &cobra.Command{
-	Use:   "reset admin user password",
-	Short: "reset admin user password inside ELN service " + nameCLI,
+var resetPasswordConsoleInstanceRootCmd = &cobra.Command{
+	Use:   "reset user password",
+	Short: "reset user password inside ELN service",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, _ []string) {
 		// password reset for ADM
@@ -194,4 +192,5 @@ func init() {
 	consoleInstanceRootCmd.AddCommand(shellConsoleInstanceRootCmd)
 	consoleInstanceRootCmd.AddCommand(railsConsoleInstanceRootCmd)
 	consoleInstanceRootCmd.AddCommand(psqlConsoleInstanceRootCmd)
+  consoleInstanceRootCmd.AddCommand(resetPasswordConsoleInstanceRootCmd)
 }

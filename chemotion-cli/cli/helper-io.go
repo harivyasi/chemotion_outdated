@@ -29,10 +29,27 @@ func logwhere() {
 
 // to rewrite the configuration file
 func rewriteConfig() (err error) {
+	var (
+		keysToPreserve = []string{joinKey(stateWord, "quiet"), joinKey(stateWord, "debug")}
+		preserve       = make(map[string]any)
+	)
+	if !firstRun { // backup values
+		oldConf := parseCompose(conf.ConfigFileUsed())
+		for _, key := range keysToPreserve {
+			preserve[key] = conf.GetBool(key)   // backup key into memory
+			conf.Set(key, oldConf.GetBool(key)) // set conf's key to what is read from existing file
+		}
+	}
+	// write to file
 	if err = conf.WriteConfig(); err == nil {
 		zboth.Debug().Msgf("Modified configuration file `%s`.", conf.ConfigFileUsed())
 	} else {
 		zboth.Warn().Err(err).Msgf("Failed to update the configuration file.")
+	}
+	if !firstRun { // restore values in conf from memory
+		for _, key := range keysToPreserve {
+			conf.Set(key, preserve[key])
+		}
 	}
 	return
 }
@@ -94,16 +111,14 @@ func execShell(command string) (result []byte, err error) {
 }
 
 // to be called from the folder where file exists
-func removeKeys(filename string, keys []string) (err error) {
+func changeKey(filename string, key string, value string) (err error) {
 	var where string
 	where, err = os.Getwd()
 	if err == nil {
 		if existingFile(filename) {
-			for _, key := range keys {
-				if success := callVirtualizer(toSprintf("run --rm -v %s:/workdir mikefarah/yq eval -i del(.%s) %s", where, key, filename)); !success {
-					err = toError("failed to update %s in %s", key, filename)
-					return
-				}
+			if success := callVirtualizer(toSprintf("run --rm -v %s:/workdir mikefarah/yq eval -i .%s=\"%s\" %s", where, key, value, filename)); !success {
+				err = toError("failed to update %s in %s", key, filename)
+				return
 			}
 		} else {
 			err = toError("file %s not found", filename)
