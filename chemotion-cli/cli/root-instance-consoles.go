@@ -14,11 +14,12 @@ var consoleInstanceRootCmd = &cobra.Command{
 	ValidArgs: maps.Keys(consoleInstanceCmdTable),
 	Run: func(cmd *cobra.Command, args []string) {
 		isInteractive(true)
-		acceptedOpts := []string{"shell", "ruby on rails", "postgresSQL"}
+		acceptedOpts := []string{"shell", "ruby on rails", "postgresSQL", "reset user password"}
 		consoleInstanceCmdTable["shell"] = shellConsoleInstanceRootCmd.Run
 		consoleInstanceCmdTable["ruby on rails"] = railsConsoleInstanceRootCmd.Run
-		consoleInstanceCmdTable["postgresSQL"] = psqlConsoleInstanceRootCmd.Run
-		if cmd.Use == cmd.CalledAs() || elementInSlice(cmd.CalledAs(), &cmd.Aliases) > -1 {
+		consoleInstanceCmdTable["postgreSQL"] = psqlConsoleInstanceRootCmd.Run
+		consoleInstanceCmdTable["reset user password"] = resetPasswordConsoleInstanceRootCmd.Run
+		if cmd.Use == cmd.CalledAs() { // || elementInSlice(cmd.CalledAs(), &cmd.Aliases) > -1 {
 			acceptedOpts = append(acceptedOpts, "exit")
 		} else {
 			acceptedOpts = append(acceptedOpts, []string{"back", "exit"}...)
