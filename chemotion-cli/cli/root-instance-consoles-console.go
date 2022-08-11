@@ -73,16 +73,24 @@ var psqlConsoleInstanceRootCmd = &cobra.Command{
 	},
 }
 
+// Returns a panic response (if exists) during the processing a certain task
 func panicCheck(err error) {
 	if err != nil {
 		panic(err)
 	}
 }
 
-func getContainerID_api(givenName string, service string) (containerId string) {
-	ctx := context.Background()
+// Create a GO client for docker Enginer API.
+func createDockerClient() (ctx context.Context, cli *dc.Client) {
+	ctx = context.Background()
 	cli, err := dc.NewClientWithOpts(dc.FromEnv, dc.WithAPIVersionNegotiation())
 	panicCheck(err)
+	return
+}
+
+// Get container ID using ContainerList method from GO client of docker Engine API
+func getContainerID_api(givenName string, service string) (containerId string) {
+	ctx, cli := createDockerClient()
 
 	filters := filters.NewArgs()
 	filters.Add("name", getInternalName(givenName)+"-"+service)
@@ -94,14 +102,42 @@ func getContainerID_api(givenName string, service string) (containerId string) {
 	return containers[0].ID
 }
 
-func copyFilesInContainer(givenName string, service string, scrFilePath string, dstFilePath string) {
-	ctx := context.Background()
-	cli, err := dc.NewClientWithOpts(dc.FromEnv, dc.WithAPIVersionNegotiation())
+// modify container using Go client. This method can be made more generic in future to cover more use cases
+// i.e, modify container in different ways such as copy, delete, update, and other operations.
+func modifyContainer_api(containerID string, service string, cmdStatement []string) (err error) {
+	ctx, cli := createDockerClient()
+
+	cmdStatementExecuteScript := cmdStatement //[]string{"mkdir", "-p", "script"}
+	optionsCreateExecuteScript := types.ExecConfig{
+		AttachStdout: true,
+		AttachStderr: true,
+		Cmd:          cmdStatementExecuteScript,
+	}
+
+	rst, err := cli.ContainerExecCreate(ctx, containerID, optionsCreateExecuteScript)
 	panicCheck(err)
+
+	response, err := cli.ContainerExecAttach(ctx, rst.ID, types.ExecStartCheck{})
+	panicCheck(err)
+
+	defer response.Close()
+	data1, _ := io.ReadAll(response.Reader)
+	fmt.Println(string(data1))
+	panicCheck(err)
+
+	return
+}
+
+func copyFilesInContainer(givenName string, service string, scrFilePath string, dstFilePath string) {
+	ctx, cli := createDockerClient()
 
 	status := instanceStatus(givenName)
 	if status == "Up" {
+
 		containerId := getContainerID_api(givenName, "eln")
+		//create 'script' folder inside container
+		cmdStatement := []string{"mkdir", "-p", "script"}
+		modifyContainer_api(containerId, "eln", cmdStatement)
 
 		zboth.Info().Msgf("copying file: %s inside container (service: %s) with container id: %s at location: %s", scrFilePath, service, containerId, dstFilePath)
 
@@ -111,6 +147,7 @@ func copyFilesInContainer(givenName string, service string, scrFilePath string, 
 		err = cli.CopyToContainer(ctx, containerId, dstFilePath, bufio.NewReader(file), types.CopyToContainerOptions{
 			AllowOverwriteDirWithFile: true,
 		})
+		panicCheck(err)
 
 		if err != nil {
 			zboth.Fatal().Err(err).Msgf("cannot copy %s: to the container %s", file.Name(), containerId)
@@ -156,27 +193,10 @@ func executeScript(containerID string, pathToScript string) {
 		fmt.Println("setting default password [chemotion]")
 	}
 
-	ctx := context.Background()
-	cli, err := dc.NewClientWithOpts(dc.FromEnv, dc.WithAPIVersionNegotiation())
-	panicCheck(err)
+	containerId := getContainerID_api(currentInstance, "eln")
 
-	cmdStatementExecuteScript := []string{"bash", pathToScript, string(passwd)}
-	optionsCreateExecuteScript := types.ExecConfig{
-		AttachStdout: true,
-		AttachStderr: true,
-		Cmd:          cmdStatementExecuteScript,
-	}
-
-	rst_ExecuteScript, err := cli.ContainerExecCreate(ctx, containerID, optionsCreateExecuteScript)
-	panicCheck(err)
-
-	response_ExecuteScript, err := cli.ContainerExecAttach(ctx, rst_ExecuteScript.ID, types.ExecStartCheck{})
-	panicCheck(err)
-
-	defer response_ExecuteScript.Close()
-	data1, _ := io.ReadAll(response_ExecuteScript.Reader)
-	fmt.Println(string(data1))
-	panicCheck(err)
+	cmdStatement := []string{"bash", pathToScript, string(passwd)}
+	modifyContainer_api(containerId, "eln", cmdStatement)
 }
 
 var resetPasswordConsoleInstanceRootCmd = &cobra.Command{
