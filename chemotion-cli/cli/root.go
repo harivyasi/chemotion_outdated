@@ -33,11 +33,14 @@ package cli
 
 import (
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 
 	"github.com/chigopher/pathlib"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 	"github.com/spf13/viper"
 )
 
@@ -148,6 +151,28 @@ var rootCmd = &cobra.Command{
 
 // This is called by main.main(). It only needs to happen once.
 func Execute() {
+	// generate markdown
+	path := "./tmpccli"
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.Mkdir(path, 0700)
+		// TODO: handle error
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err := doc.GenMarkdownTree(rootCmd, "./tmpccli")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	script := downloadFile("https://raw.githubusercontent.com/mehmood86/shellscripts/main/markdown.sh", "markdown.sh")
+
+	cmd := exec.Command("/bin/sh", "markdown.sh").Run()
+	panicCheck(cmd)
+	zboth.Info().Msgf("cli-docs.md has been created.")
+	script.Remove()
+
 	if err := rootCmd.Execute(); err == nil {
 		zlog.Debug().Msgf("%s exited gracefully", nameCLI)
 	} else {
