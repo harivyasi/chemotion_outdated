@@ -32,6 +32,7 @@ POSSIBILITY OF SUCH DAMAGE.
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -151,27 +152,35 @@ var rootCmd = &cobra.Command{
 
 // This is called by main.main(). It only needs to happen once.
 func Execute() {
-	// generate markdown
-	path := "./tmpccli"
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.Mkdir(path, 0700)
-		// TODO: handle error
+	markdownFile := "cli-docs.md"
+	if _, err := os.Stat(markdownFile); errors.Is(err, os.ErrNotExist) {
+		zboth.Info().Msgf("%s not found, generating...", markdownFile)
+		// check if tempccli folder exists.
+		path := "./tmpccli"
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			err := os.Mkdir(path, 0700)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		// generate markdownTree for all cobra.commands.
+		err := doc.GenMarkdownTree(rootCmd, "./tmpccli")
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		// Modify markdown files and combined them into single file.
+		// script is based on GNU distribution and works only on bash.
+		script := downloadFile("https://raw.githubusercontent.com/mehmood86/shellscripts/main/markdown.sh", "markdown.sh")
+
+		cmd := exec.Command("/bin/sh", "markdown.sh").Run()
+		panicCheck(cmd)
+		zboth.Info().Msgf("%s has been generated", markdownFile)
+		script.Remove()
+	} else {
+		zboth.Info().Msgf("%s already exists", markdownFile)
 	}
-
-	err := doc.GenMarkdownTree(rootCmd, "./tmpccli")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	script := downloadFile("https://raw.githubusercontent.com/mehmood86/shellscripts/main/markdown.sh", "markdown.sh")
-
-	cmd := exec.Command("/bin/sh", "markdown.sh").Run()
-	panicCheck(cmd)
-	zboth.Info().Msgf("cli-docs.md has been created.")
-	script.Remove()
 
 	if err := rootCmd.Execute(); err == nil {
 		zlog.Debug().Msgf("%s exited gracefully", nameCLI)
