@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -33,7 +34,7 @@ func init() {
 
 func setDefaultValue(someValue string, defaultValue string) string {
 
-	if string(someValue) == "" {
+	if string(someValue) == "\n" || string(someValue) == "" {
 		someValue = string(defaultValue)
 	}
 	return someValue
@@ -54,29 +55,29 @@ func userDataInput() ([]byte, string, string, string) {
 		fmt.Println("setting default password [chemotion]")
 	}
 
-	fmt.Println(Green + "First name: " + Reset)
-	fmt.Scanln(&fname)
-	fname = setDefaultValue(fname, "ELN")
-	fmt.Println(Green + "Last name: " + Reset)
-	fmt.Scanln(&lname)
-	lname = setDefaultValue(lname, "User")
-	fmt.Println(Yellow + "Please enter a unique abbreviation." + Reset)
-	fmt.Println(Green + "abbriviation: " + Reset)
-	fmt.Scanln(&abbreviation)
-	abbreviation = setDefaultValue(abbreviation, "CU1")
-	/*
-		//optionaly print to the console, but not necessarily required
-		fmt.Println("--------------------------------------------------")
-		fmt.Println(Yellow + "Following data will be send to the database:" + Reset)
-		fmt.Println(Yellow+"first name ", fname)
-		fmt.Println(Yellow+"last name: ", lname)
-		fmt.Println(Yellow+"abbreviation: ", abbreviation)
-		fmt.Println(Reset + "--------------------------------------------------")
-	*/
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println(Green + "Enter First name: " + Reset)
+	fname, _ = reader.ReadString('\n')
+
+	fmt.Println(Green + "Enter Last name: " + Reset)
+	lname, _ = reader.ReadString('\n')
+
+	fmt.Println(Green + "Enter a unique abbreviation." + Reset)
+	abbreviation, _ = reader.ReadString('\n')
+
+	fmt.Println(Green + "Processing..." + Reset)
+
+	fname = strings.TrimSuffix(fname, "\n")
+	lname = strings.TrimSuffix(lname, "\n")
+	abbreviation = strings.TrimSuffix(abbreviation, "\n")
+
 	return passwd, fname, lname, abbreviation
 }
 
-// Download a file from a specified url, tar it and move it to script directory inside a container
+// setupScript function downloads a file from a specified url, tar it and move it to script directory inside a container.
+//
+// This function can be avoided, if scripts are direclty supplied with docker image of Chemotion.
 func setupScript(url string, script_name string) {
 	script := downloadFile(url, script_name)
 	script_tar := getNewUniqueID() + ".tar"
@@ -100,6 +101,13 @@ func setupScript(url string, script_name string) {
 	pathlib.NewPath(script_tar).Remove()
 }
 
+func setUpDockerCleint() (context.Context, *dc.Client) {
+	ctx := context.Background()
+	cli, err := dc.NewClientWithOpts(dc.FromEnv, dc.WithAPIVersionNegotiation())
+	panicCheck(err)
+	return ctx, cli
+}
+
 func handleCreateUserLogic() {
 	containerID := getContainerID_api(currentInstance, "eln")
 	pathToScript := "/script/createScript.sh"
@@ -108,13 +116,11 @@ func handleCreateUserLogic() {
 	script_name := "createScript.sh"
 	setupScript(url, script_name)
 
-	ctx := context.Background()
-	cli, err := dc.NewClientWithOpts(dc.FromEnv, dc.WithAPIVersionNegotiation())
-	panicCheck(err)
+	ctx, cli := setUpDockerCleint()
 
 	var email string
-	fmt.Println(Yellow + "Please enter a unique email address." + Reset)
-	fmt.Println(Green + "Enter an Email for new user." + Reset)
+
+	fmt.Println(Green + "Enter an Unique E-mail address for new user." + Reset)
 	fmt.Scanln(&email)
 	email = setDefaultValue(email, "eln-user@kit.edu")
 
@@ -124,17 +130,6 @@ func handleCreateUserLogic() {
 	fname = setDefaultValue(fname, "ELN")
 	lname = setDefaultValue(lname, "User")
 	abbreviation = setDefaultValue(abbreviation, "CU1")
-
-	/*
-		//optionaly print to the console, but not necessarily required
-		fmt.Println("--------------------------------------------------")
-		fmt.Println(Yellow + "Following data will be send to the database:" + Reset)
-		fmt.Println(Yellow+"email: ", email)
-		fmt.Println(Yellow+"first name ", fname)
-		fmt.Println(Yellow+"last name: ", lname)
-		fmt.Println(Yellow+"abbreviation: ", abbreviation)
-		fmt.Println(Reset + "--------------------------------------------------")
-	*/
 
 	arg1 := email
 	arg2 := passwd
@@ -160,10 +155,10 @@ func handleCreateUserLogic() {
 
 	if strings.Contains(string(data), "false") {
 		fmt.Println(Red + "WARNING!" + Reset)
-		fmt.Printf(Yellow+"Please enter a unique email and abbreviation. This error occured because either email: %s, or abbreviation:%s already exists.\n", arg1, arg5+Reset)
+		fmt.Printf("Enter a unique (Non-Empty) E-Mail address and abbreviation.\n")
+		fmt.Printf("Check if E-Mail: %s, or abbreviation: %s already exists\n", arg1, arg5)
 	} else {
-		fmt.Println(Green + "Success" + Reset)
-		fmt.Println(Green + "New user created successfully." + Reset)
+		fmt.Printf(Green+"User with E-Mail: %s created successfully.\n", email+Reset)
 	}
 }
 
@@ -176,49 +171,79 @@ func handleUpdateUserLogic() {
 	script_name := "updateScript.sh"
 	setupScript(url, script_name)
 
-	ctx := context.Background()
-	cli, err := dc.NewClientWithOpts(dc.FromEnv, dc.WithAPIVersionNegotiation())
-	panicCheck(err)
+	ctx, cli := setUpDockerCleint()
 
 	var email string
-	fmt.Println(Yellow + "Please enter a unique email address." + Reset)
-	fmt.Println(Green + "Enter an Email for new user." + Reset)
+	fmt.Println(Yellow + "Enter E-Mail address of the user that need to be be updated." + Reset)
 	fmt.Scanln(&email)
 
-	passwd, fname, lname, abbreviation := userDataInput()
-	arg1 := email
-	arg2 := passwd       //Password
-	arg3 := fname        //first name
-	arg4 := lname        //last name
-	arg5 := abbreviation //abbreviation
-
-	cmdStatementExecuteScript := []string{"bash", pathToScript, arg1, string(arg2), arg3, arg4, arg5}
-	optionsCreateExecuteScript := types.ExecConfig{
-		AttachStdout: true,
-		AttachStderr: true,
-		Cmd:          cmdStatementExecuteScript,
-	}
-
-	rst_ExecuteScript, err := cli.ContainerExecCreate(ctx, containerID, optionsCreateExecuteScript)
-	panicCheck(err)
-
-	response_ExecuteScript, err := cli.ContainerExecAttach(ctx, rst_ExecuteScript.ID, types.ExecStartCheck{})
-	panicCheck(err)
-
-	defer response_ExecuteScript.Close()
-	data, _ := io.ReadAll(response_ExecuteScript.Reader)
-
-	if strings.Contains(string(data), "false") {
-		fmt.Println(Red + "WARNING!" + Reset)
-		fmt.Printf(Yellow+"Please enter a unique email and abbreviation. This error occured because either email: %s, or abbreviation:%s already exists.\n", arg1, arg5+Reset)
+	if email == "" {
+		log.Fatal(Red + "Aborting. Please provide an E-Mail to continue with update process." + Reset)
 	} else {
-		fmt.Println(Green + "Success" + Reset)
-		fmt.Println(Green + "User updated successfully." + Reset)
+		passwd, fname, lname, abbreviation := userDataInput()
+		arg1 := email
+		arg2 := passwd
+		arg3 := fname
+		arg4 := lname
+		arg5 := abbreviation
+
+		cmdStatementExecuteScript := []string{"bash", pathToScript, arg1, string(arg2), arg3, arg4, arg5}
+		optionsCreateExecuteScript := types.ExecConfig{
+			AttachStdout: true,
+			AttachStderr: true,
+			Cmd:          cmdStatementExecuteScript,
+		}
+
+		rst_ExecuteScript, err := cli.ContainerExecCreate(ctx, containerID, optionsCreateExecuteScript)
+		panicCheck(err)
+
+		response_ExecuteScript, err := cli.ContainerExecAttach(ctx, rst_ExecuteScript.ID, types.ExecStartCheck{})
+		panicCheck(err)
+
+		defer response_ExecuteScript.Close()
+		data, _ := io.ReadAll(response_ExecuteScript.Reader)
+		fmt.Println(string(data))
+
 	}
 }
 
 func handleDeleteUserLogic() {
-	fmt.Println("Handler is called.")
+	containerID := getContainerID_api(currentInstance, "eln")
+	pathToScript := "/script/deleteScript.sh"
+
+	// Download a file and copy it inside running container
+	url := "https://raw.githubusercontent.com/mehmood86/shellscripts/main/deleteScript.sh"
+	script_name := "deleteScript.sh"
+	setupScript(url, script_name)
+
+	ctx, cli := setUpDockerCleint()
+
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println(Red + "WARNING: " + Yellow + "The user will be deleted." + Reset)
+	fmt.Println("E-Mail address: ")
+	email, _ := reader.ReadString('\n')
+	email = strings.TrimSuffix(email, "\n")
+	if email == "" {
+		log.Fatal(Red + "Aborting. Please provide an E-Mail to continue with delete process." + Reset)
+	} else {
+		cmdStatementExecuteScript := []string{"bash", pathToScript, email}
+		optionsCreateExecuteScript := types.ExecConfig{
+			AttachStdout: true,
+			AttachStderr: true,
+			Cmd:          cmdStatementExecuteScript,
+		}
+
+		rst_ExecuteScript, err := cli.ContainerExecCreate(ctx, containerID, optionsCreateExecuteScript)
+		panicCheck(err)
+
+		response_ExecuteScript, err := cli.ContainerExecAttach(ctx, rst_ExecuteScript.ID, types.ExecStartCheck{})
+		panicCheck(err)
+
+		defer response_ExecuteScript.Close()
+		data, _ := io.ReadAll(response_ExecuteScript.Reader)
+		fmt.Println(string(data))
+	}
 }
 
 // create a new user of type Admin, Person and Device (for now only type:Person is supported)
@@ -264,10 +289,8 @@ var deleteUserManagementInstanceRootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Handle delete user logic here
 		if ownCall(cmd) {
-			fmt.Println("triggered by own call")
 			handleDeleteUserLogic()
 		} else {
-			fmt.Println("triggered via cli menu")
 			handleDeleteUserLogic()
 		}
 	},
