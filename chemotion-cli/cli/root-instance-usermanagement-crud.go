@@ -263,22 +263,6 @@ func handleListAssociatedServices() {
 	}
 }
 
-func handleCypressTests() {
-	fmt.Println("Hello from Cypress Testing service.")
-
-	app := "npm"
-	cmd := exec.Command(app, "install", "cypress", "--save-dev")
-	cmd.Stdout = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	log.Printf("path: %s", cmd)
-	err := cmd.Run()
-	if err != nil {
-		log.Fatalf("failed to call cmd.Run(): %v", err)
-	}
-
-}
-
 // create a new user of type Admin, Person and Device (for now only type:Person is supported)
 var createUserManagementInstanceRootCmd = &cobra.Command{
 	Use:     "create",
@@ -344,25 +328,9 @@ var listUserManagementInstanceRootCmd = &cobra.Command{
 	},
 }
 
-var cypressUserManagementInstanceRootCmd = &cobra.Command{
-	Use:     "cypress",
-	Aliases: []string{"c", "cypress"},
-	Args:    cobra.NoArgs,
-	Short:   "Cypress tesing " + nameCLI,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Handle list all users logic here
-		if ownCall(cmd) {
-			handleCypressTests()
-		} else {
-			handleCypressTests()
-		}
-	},
-}
-
 func init() {
 	usermanagementCmd.AddCommand(createUserManagementInstanceRootCmd)
 	usermanagementCmd.AddCommand(deleteUserManagementInstanceRootCmd)
 	usermanagementCmd.AddCommand(listUserManagementInstanceRootCmd)
 	usermanagementCmd.AddCommand(updateUserManagementInstanceRootCmd)
-	usermanagementCmd.AddCommand(cypressUserManagementInstanceRootCmd)
 }
