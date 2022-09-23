@@ -1,7 +1,7 @@
 ####################################################################################################
 # BASE IMAGE: TIMEZONE, LOCALES, YQ, TINI
 ####################################################################################################
-FROM ubuntu:focal
+FROM ubuntu:focal AS chemotion-cli-hull
 ARG DEBIAN_FRONTEND=noninteractive
 
 # all ARGS are set as meaningless specifically because we want them to specified by user
@@ -108,6 +108,29 @@ RUN asdf plugin add ruby https://github.com/asdf-vm/asdf-ruby.git && \
     asdf install ruby ${VERSION_RUBY} && \
     asdf global ruby $(asdf list ruby) && \
     gem install bundler -v ${VERSION_BUNDLER}
+
+SHELL ["/bin/bash", "-c"]
+CMD ["/bin/bash"]
+
+FROM chemotion-cli-hull AS chemotion-cli-cargo
+
+COPY tmp/anchors/package.json .
+COPY tmp/anchors/yarn.lock    .
+COPY tmp/anchors/Gemfile      .
+COPY tmp/anchors/Gemfile.lock .
+
+RUN touch package_postinstall.sh
+RUN chmod +x package_postinstall.sh
+RUN yarn install --modules-folder /cargo/node_modules --cache-folder /cargo/yarn
+RUN rm package_postinstall.sh
+
+ENV GEM_HOME=/cargo/gems
+RUN mkdir  ${GEM_HOME}
+RUN gem    install solargraph
+RUN bundle install --jobs=$(getconf _NPROCESSORS_ONLN)
+RUN if [[ $(grep -L passenger Gemfile) ]]; then bundle add passenger; fi
+
+RUN rm /package.json /yarn.lock /Gemfile /Gemfile.lock
 
 SHELL ["/bin/bash", "-c"]
 CMD ["/bin/bash"]
