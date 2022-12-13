@@ -181,7 +181,7 @@ func initConf() {
 		} else {
 			zboth.Fatal().Err(err).Msgf("Failed to read configuration file: %s. ABORT!", configFile)
 		}
-	} else {
+	} else if !firstRun {
 		zboth.Fatal().Err(toError("config file not found")).Msgf("Failed to read the configuration file: %s. ABORT!", configFile)
 	}
 	zlog.Debug().Msgf("End: initialize configuration; Config found?: %t; is inside container?: %t", !firstRun, isInContainer)
